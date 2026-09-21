@@ -30,6 +30,7 @@ class FipiClient:
                 "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
             },
         )
+        self._warmed: set[str] = set()
 
     def close(self) -> None:
         self._client.close()
@@ -88,7 +89,17 @@ class FipiClient:
         }
         return self._post("/questions.php", data)
 
+    def warmup(self, proj: str) -> None:
+        """Прогреть PHPSESSID: без этого solve.php отвечает "Пользователь не определён"."""
+        if proj in self._warmed:
+            return
+        self.index()
+        self.project_page(proj)
+        self.questions(proj, page=0, pagesize=5)
+        self._warmed.add(proj)
+
     def solve(self, proj: str, guid: str, answer: str) -> str:
+        self.warmup(proj)
         return self._post(
             "/solve.php",
             {

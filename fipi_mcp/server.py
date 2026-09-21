@@ -63,20 +63,19 @@ def get_task(subject: str, qid: str, max_pages: int = 50) -> dict[str, Any]:
 
 @mcp.tool()
 def check_answer(subject: str, guid: str, answer: str) -> dict[str, Any]:
-    """Проверить ответ через solve.php ФИПИ. `guid` — полный 32-hex ID задания.
+    """Проверить ответ через solve.php ФИПИ. `guid` — полный 32-hex ID задания
+    (не короткий qid). Клиент сам прогревает сессию перед POST-ом.
 
-    ВАЖНО: анонимно endpoint возвращает «Пользователь не определён». Работает
-    только с валидной авторизованной сессией. Тул оставлен для будущего
-    расширения (передача cookies), пока status='unauthorized' — ожидаемый.
+    Коды ФИПИ (расшифрованы экспериментально): 3=correct, 2=wrong, 0=not_found.
     """
     name, proj_guid = resolve(subject)
     with FipiClient() as client:
         raw = client.solve(proj_guid, guid, answer)
-    mapping = {"0": "wrong", "1": "correct", "2": "partial", "3": "partial"}
+    mapping = {"3": "correct", "2": "wrong", "0": "not_found", "1": "correct"}
     if raw in mapping:
         status = mapping[raw]
     elif "Пользователь" in raw or "не определ" in raw.lower():
-        status = "unauthorized"
+        status = "session_expired"
     else:
         status = "unknown"
     return {

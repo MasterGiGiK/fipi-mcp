@@ -1,5 +1,10 @@
 # fipi-mcp
 
+[![smoke](https://github.com/MasterGiGiK/fipi-mcp/actions/workflows/smoke.yml/badge.svg)](https://github.com/MasterGiGiK/fipi-mcp/actions/workflows/smoke.yml)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![MCP](https://img.shields.io/badge/protocol-MCP-8A2BE2)](https://modelcontextprotocol.io/)
+
 MCP-сервер для открытого банка заданий ФИПИ (ЕГЭ) — `https://ege.fipi.ru/bank/`.
 
 Даёт LLM/агенту структурированный доступ к заданиям 16 предметов ЕГЭ: список,
@@ -12,7 +17,7 @@ MCP-сервер для открытого банка заданий ФИПИ (�
 | `list_subjects` | Возвращает 16 предметов с ключами и `proj_guid`. |
 | `list_tasks(subject, page=0, pagesize=10)` | Список задач страницы: `qid`, `guid`, условие в HTML/тексте/LaTeX, КЭС, тип ответа. |
 | `get_task(subject, qid)` | Ищет конкретное задание по короткому qid, перебирая страницы. |
-| `check_answer(subject, guid, answer)` | POST на `solve.php`. Требует авторизованной сессии ФИПИ; анонимно возвращает `unauthorized`. |
+| `check_answer(subject, guid, answer)` | POST на `solve.php`. Клиент сам прогревает сессию. Возвращает `correct` / `wrong` / `not_found`. |
 
 `subject` принимает три формата: ключ (`physics`), русское название (`Физика`)
 или полный `proj_guid`.
@@ -92,7 +97,5 @@ claude mcp add fipi-bank \
 - Нет пагинации-cursor: серверу передаётся `page` и `pagesize`. `get_task`
   делает линейный перебор — дорого при глубоком поиске.
 - MathML → LaTeX покрывает основные примитивы, а не 100% спецификации.
-- `check_answer` требует аккаунта на ФИПИ — endpoint `solve.php` без
-  авторизации отвечает «Пользователь не определён». Публично работают только
-  первые три тула. Чтобы включить проверку — доработать `FipiClient` под
-  логин или пробрасывать сохранённые куки.
+- `check_answer` работает только для заданий с автоматической проверкой
+  (краткий/числовой ответ). Для развёрнутых ответов ФИПИ не проверяет.
