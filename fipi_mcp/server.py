@@ -90,6 +90,64 @@ def list_kes_topics(subject: str, exam: str = "ege") -> dict[str, Any]:
 
 
 @mcp.tool()
+def search_tasks(
+    subject: str,
+    query: str,
+    exam: str = "ege",
+    themes: list[str] | None = None,
+    answer_types: list[str] | None = None,
+    max_pages: int = 10,
+    pagesize: int = 20,
+) -> dict[str, Any]:
+    """Клиентский полнотекстовый поиск по условиям заданий.
+
+    ФИПИ не отдаёт серверного текстового поиска, поэтому тул обходит страницы
+    предмета и ищет подстроку `query` в `condition_text` (case-insensitive).
+    ДОРОГО: по умолчанию до 10 страниц × 20 задач = ~200 задач за запрос.
+    Обязательно сужай область через `themes` (тема КЭС) и/или `answer_types`.
+
+    Возвращает найденные задачи + счётчик проверенных страниц.
+    """
+    name, guid = resolve(subject, exam=exam)
+    needle = query.strip().lower()
+    if not needle:
+        raise ValueError("query must be non-empty")
+
+    filters: dict[str, Any] = {}
+    if themes:
+        filters["theme"] = list(themes)
+    if answer_types:
+        filters["qkind"] = [_ANSWER_TYPES.get(t.lower(), t) for t in answer_types]
+
+    matches: list[dict[str, Any]] = []
+    pages_checked = 0
+    with FipiClient(exam=exam) as client:
+        for page in range(max_pages):
+            if filters:
+                html = client.filter_questions(
+                    guid, {**filters, "search": "1"}, page=page, pagesize=pagesize
+                )
+            else:
+                html = client.questions(guid, page=page, pagesize=pagesize)
+            tasks = parse_tasks(html)
+            pages_checked = page + 1
+            if not tasks:
+                break
+            for task in tasks:
+                if needle in task["condition_text"].lower():
+                    matches.append(task)
+    return {
+        "exam": exam,
+        "subject": name,
+        "query": query,
+        "filters": filters or None,
+        "pages_checked": pages_checked,
+        "match_count": len(matches),
+        "matches": matches,
+    }
+
+
+@mcp.tool()
 def get_task(subject: str, qid: str, exam: str = "ege", max_pages: int = 50) -> dict[str, Any]:
     """Найти задание по короткому 6-hex qid, перебирая страницы предмета.
 
