@@ -5,10 +5,16 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 
 from .client import FipiClient
-from .parser import parse_tasks
+from .parser import parse_kes_topics, parse_tasks
 from .subjects import SUBJECTS_EGE, resolve
 
 mcp = MCPServer("fipi-bank")
+
+_ANSWER_TYPES = {
+    "short": "ILI_STD_SHORT",
+    "full": "ILI_STD_FULL",
+    "select_one": "ILI_STD_SELECTONE",
+}
 
 
 @mcp.tool()
@@ -21,23 +27,60 @@ def list_subjects() -> list[dict[str, str]]:
 
 
 @mcp.tool()
-def list_tasks(subject: str, page: int = 0, pagesize: int = 10) -> dict[str, Any]:
-    """Список заданий по предмету.
+def list_tasks(
+    subject: str,
+    page: int = 0,
+    pagesize: int = 10,
+    themes: list[str] | None = None,
+    answer_types: list[str] | None = None,
+    task_id: str | None = None,
+) -> dict[str, Any]:
+    """Список заданий по предмету с опциональными фильтрами.
 
     subject — ключ ('physics'), русское название или proj-GUID.
     page — номер страницы с нуля.
     pagesize — размер страницы (обычно 10 или 20).
+    themes — коды КЭС из list_kes_topics: ['2.4'] или ['1', '2.4'] (раздел или подтема).
+    answer_types — типы ответа: 'short' | 'full' | 'select_one' (или сырые коды ILI_STD_*).
+    task_id — фильтр по короткому 6-hex qid ('40B442').
     """
     name, guid = resolve(subject)
+    filters: dict[str, Any] = {}
+    if themes:
+        filters["theme"] = list(themes)
+    if answer_types:
+        filters["qkind"] = [_ANSWER_TYPES.get(t.lower(), t) for t in answer_types]
+    if task_id:
+        filters["qid"] = task_id
+
     with FipiClient() as client:
-        html = client.questions(guid, page=page, pagesize=pagesize)
+        if filters:
+            filters["search"] = "1"
+            html = client.filter_questions(guid, filters, page=page, pagesize=pagesize)
+        else:
+            html = client.questions(guid, page=page, pagesize=pagesize)
+
     return {
         "subject": name,
         "proj_guid": guid,
         "page": page,
         "pagesize": pagesize,
+        "filters": {k: v for k, v in filters.items() if k != "search"} or None,
         "tasks": parse_tasks(html),
     }
+
+
+@mcp.tool()
+def list_kes_topics(subject: str) -> dict[str, Any]:
+    """Дерево кодификатора элементов содержания (КЭС) для предмета.
+
+    Возвращает разделы верхнего уровня и подтемы с их кодами. Полученный
+    `code` (например '2.4') передавай в list_tasks(themes=[...]) для фильтра.
+    """
+    name, guid = resolve(subject)
+    with FipiClient() as client:
+        html = client.project_page(guid)
+    return {"subject": name, "proj_guid": guid, "topics": parse_kes_topics(html)}
 
 
 @mcp.tool()

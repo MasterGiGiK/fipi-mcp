@@ -9,10 +9,12 @@ import sys
 from pathlib import Path
 
 from fipi_mcp.mathml import mathml_to_latex
-from fipi_mcp.parser import parse_tasks
+from fipi_mcp.parser import parse_kes_topics, parse_tasks
 from fipi_mcp.subjects import SUBJECTS_EGE, resolve
 
-FIXTURE = Path(__file__).parent / "fixtures" / "questions_math_prof.html"
+FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURE = FIXTURES / "questions_math_prof.html"
+PROJECT_FIXTURE = FIXTURES / "project_math_prof.html"
 
 
 def _check(cond: bool, msg: str) -> None:
@@ -44,6 +46,20 @@ def main() -> None:
     )
     _check("вектор" in task_40b442["condition_text"].lower(), "condition contains 'вектор'")
     _check(r"\vec{a}" in task_40b442["condition_latex"], "MathML → LaTeX vector rendered")
+
+    print("\nKES topics from project page:")
+    topics = parse_kes_topics(PROJECT_FIXTURE.read_text(encoding="utf-8"))
+    _check(len(topics) == 7, f"7 top-level sections (got {len(topics)})")
+    codes = {s["code"] for s in topics}
+    _check(codes == {"1", "2", "3", "4", "5", "6", "7"}, "section codes 1..7")
+    section_2 = next(s for s in topics if s["code"] == "2")
+    subcodes = {c["code"] for c in section_2["children"]}
+    _check("2.4" in subcodes, "subtopic 2.4 present under section 2")
+    sub_2_4 = next(c for c in section_2["children"] if c["code"] == "2.4")
+    _check(
+        "Показательные" in sub_2_4["name"],
+        "subtopic 2.4 has expected name",
+    )
 
     print("\nMathML → LaTeX unit checks:")
     _check(mathml_to_latex("<math><mfrac><mn>1</mn><mn>2</mn></mfrac></math>") == r"\frac{1}{2}", "mfrac")

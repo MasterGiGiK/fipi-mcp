@@ -48,6 +48,42 @@ def _flatten(node: Tag) -> tuple[str, str]:
     return text, latex
 
 
+def parse_kes_topics(html: str) -> list[dict[str, Any]]:
+    """Дерево КЭС со страницы предмета: разделы верхнего уровня + подтемы.
+
+    Возвращает: [{"code": "1", "name": "...", "children": [{"code": "1.1", ...}]}].
+    """
+    soup = BeautifulSoup(html, "lxml")
+    sections: dict[str, dict[str, Any]] = {}
+
+    for section_label in soup.select("div.filter-title + div label"):
+        checkbox = section_label.find("input", attrs={"name": "theme"})
+        if not isinstance(checkbox, Tag):
+            continue
+        code = str(checkbox.get("value", "")).strip()
+        if not code or "." in code:
+            continue
+        name = section_label.get_text(" ", strip=True)
+        sections.setdefault(code, {"code": code, "name": name, "children": []})
+
+    for item in soup.select("ul.dropdown-menu li.dropdown-item"):
+        checkbox = item.find("input", attrs={"name": "theme"})
+        if not isinstance(checkbox, Tag):
+            continue
+        code = str(checkbox.get("value", "")).strip()
+        if not code or "." not in code:
+            continue
+        name = item.get_text(" ", strip=True)
+        parent = code.split(".", 1)[0]
+        section = sections.setdefault(parent, {"code": parent, "name": "", "children": []})
+        section["children"].append({"code": code, "name": name})
+
+    return sorted(
+        sections.values(),
+        key=lambda s: int(s["code"]) if s["code"].isdigit() else 0,
+    )
+
+
 def parse_tasks(html: str) -> list[dict[str, Any]]:
     soup = BeautifulSoup(html, "lxml")
     tasks: list[dict[str, Any]] = []
