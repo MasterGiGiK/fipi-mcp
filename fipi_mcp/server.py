@@ -6,7 +6,7 @@ from mcp.server.mcpserver import MCPServer
 
 from .client import FipiClient
 from .parser import parse_kes_topics, parse_tasks
-from .subjects import SUBJECTS_EGE, resolve
+from .subjects import registry, resolve
 
 mcp = MCPServer("fipi-bank")
 
@@ -18,17 +18,21 @@ _ANSWER_TYPES = {
 
 
 @mcp.tool()
-def list_subjects() -> list[dict[str, str]]:
-    """Список предметов ЕГЭ, доступных в открытом банке ФИПИ."""
+def list_subjects(exam: str = "ege") -> list[dict[str, str]]:
+    """Список предметов открытого банка ФИПИ.
+
+    exam — 'ege' (по умолчанию, 16 предметов) или 'oge' (14 предметов).
+    """
     return [
         {"key": key, "name": name, "proj_guid": guid}
-        for key, (name, guid) in SUBJECTS_EGE.items()
+        for key, (name, guid) in registry(exam).items()
     ]
 
 
 @mcp.tool()
 def list_tasks(
     subject: str,
+    exam: str = "ege",
     page: int = 0,
     pagesize: int = 10,
     themes: list[str] | None = None,
@@ -38,13 +42,14 @@ def list_tasks(
     """Список заданий по предмету с опциональными фильтрами.
 
     subject — ключ ('physics'), русское название или proj-GUID.
+    exam — 'ege' | 'oge'.
     page — номер страницы с нуля.
     pagesize — размер страницы (обычно 10 или 20).
     themes — коды КЭС из list_kes_topics: ['2.4'] или ['1', '2.4'] (раздел или подтема).
     answer_types — типы ответа: 'short' | 'full' | 'select_one' (или сырые коды ILI_STD_*).
     task_id — фильтр по короткому 6-hex qid ('40B442').
     """
-    name, guid = resolve(subject)
+    name, guid = resolve(subject, exam=exam)
     filters: dict[str, Any] = {}
     if themes:
         filters["theme"] = list(themes)
@@ -53,7 +58,7 @@ def list_tasks(
     if task_id:
         filters["qid"] = task_id
 
-    with FipiClient() as client:
+    with FipiClient(exam=exam) as client:
         if filters:
             filters["search"] = "1"
             html = client.filter_questions(guid, filters, page=page, pagesize=pagesize)
@@ -61,6 +66,7 @@ def list_tasks(
             html = client.questions(guid, page=page, pagesize=pagesize)
 
     return {
+        "exam": exam,
         "subject": name,
         "proj_guid": guid,
         "page": page,
@@ -71,28 +77,28 @@ def list_tasks(
 
 
 @mcp.tool()
-def list_kes_topics(subject: str) -> dict[str, Any]:
+def list_kes_topics(subject: str, exam: str = "ege") -> dict[str, Any]:
     """Дерево кодификатора элементов содержания (КЭС) для предмета.
 
     Возвращает разделы верхнего уровня и подтемы с их кодами. Полученный
     `code` (например '2.4') передавай в list_tasks(themes=[...]) для фильтра.
     """
-    name, guid = resolve(subject)
-    with FipiClient() as client:
+    name, guid = resolve(subject, exam=exam)
+    with FipiClient(exam=exam) as client:
         html = client.project_page(guid)
-    return {"subject": name, "proj_guid": guid, "topics": parse_kes_topics(html)}
+    return {"exam": exam, "subject": name, "proj_guid": guid, "topics": parse_kes_topics(html)}
 
 
 @mcp.tool()
-def get_task(subject: str, qid: str, max_pages: int = 50) -> dict[str, Any]:
+def get_task(subject: str, qid: str, exam: str = "ege", max_pages: int = 50) -> dict[str, Any]:
     """Найти задание по короткому 6-hex qid, перебирая страницы предмета.
 
     Дороже, чем list_tasks — используй, если знаешь qid, но нет `guid`.
     max_pages — верхняя граница перебора.
     """
-    name, guid = resolve(subject)
+    name, guid = resolve(subject, exam=exam)
     target = qid.strip().upper()
-    with FipiClient() as client:
+    with FipiClient(exam=exam) as client:
         for page in range(max_pages):
             html = client.questions(guid, page=page, pagesize=20)
             tasks = parse_tasks(html)
@@ -100,19 +106,19 @@ def get_task(subject: str, qid: str, max_pages: int = 50) -> dict[str, Any]:
                 break
             for task in tasks:
                 if task["qid"].upper() == target:
-                    return {"subject": name, "proj_guid": guid, **task}
-    raise ValueError(f"Задание {qid} не найдено в предмете {name} за {max_pages} страниц")
+                    return {"exam": exam, "subject": name, "proj_guid": guid, **task}
+    raise ValueError(f"Задание {qid} не найдено в {exam.upper()} → {name} за {max_pages} страниц")
 
 
 @mcp.tool()
-def check_answer(subject: str, guid: str, answer: str) -> dict[str, Any]:
+def check_answer(subject: str, guid: str, answer: str, exam: str = "ege") -> dict[str, Any]:
     """Проверить ответ через solve.php ФИПИ. `guid` — полный 32-hex ID задания
     (не короткий qid). Клиент сам прогревает сессию перед POST-ом.
 
     Коды ФИПИ (расшифрованы экспериментально): 3=correct, 2=wrong, 0=not_found.
     """
-    name, proj_guid = resolve(subject)
-    with FipiClient() as client:
+    name, proj_guid = resolve(subject, exam=exam)
+    with FipiClient(exam=exam) as client:
         raw = client.solve(proj_guid, guid, answer)
     mapping = {"3": "correct", "2": "wrong", "0": "not_found", "1": "correct"}
     if raw in mapping:
@@ -122,6 +128,7 @@ def check_answer(subject: str, guid: str, answer: str) -> dict[str, Any]:
     else:
         status = "unknown"
     return {
+        "exam": exam,
         "subject": name,
         "guid": guid,
         "answer": answer,

@@ -5,23 +5,25 @@
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![MCP](https://img.shields.io/badge/protocol-MCP-8A2BE2)](https://modelcontextprotocol.io/)
 
-MCP-сервер для открытого банка заданий ФИПИ (ЕГЭ) — `https://ege.fipi.ru/bank/`.
+MCP-сервер для открытого банка заданий ФИПИ (ЕГЭ и ОГЭ) —
+`https://ege.fipi.ru/bank/` и `https://oge.fipi.ru/bank/`.
 
-Даёт LLM/агенту структурированный доступ к заданиям 16 предметов ЕГЭ: список,
-условие с MathML → LaTeX, метаданные (КЭС, тип ответа) и проверку ответа.
+Даёт LLM/агенту структурированный доступ к заданиям **16 предметов ЕГЭ** и
+**14 предметов ОГЭ**: список с фильтрами по темам кодификатора, условие с
+MathML → LaTeX, метаданные (КЭС, тип ответа) и проверку ответа.
 
 ## Инструменты (MCP tools)
 
 | Tool | Что делает |
 |------|------------|
-| `list_subjects` | Возвращает 16 предметов с ключами и `proj_guid`. |
-| `list_tasks(subject, page=0, pagesize=10, themes=[], answer_types=[], task_id=?)` | Задачи страницы с фильтрами. `themes=['2.4']` — тема КЭС; `answer_types=['short'\|'full'\|'select_one']` — тип ответа. |
-| `list_kes_topics(subject)` | Дерево кодификатора: разделы 1..N + подтемы. `code` подходит для `themes` фильтра выше. |
-| `get_task(subject, qid)` | Ищет конкретное задание по короткому qid, перебирая страницы. |
-| `check_answer(subject, guid, answer)` | POST на `solve.php`. Клиент сам прогревает сессию. Возвращает `correct` / `wrong` / `not_found`. |
+| `list_subjects(exam='ege')` | Все предметы. `exam='ege'` — 16 предметов ЕГЭ, `'oge'` — 14 предметов ОГЭ. |
+| `list_tasks(subject, exam='ege', page=0, pagesize=10, themes=[], answer_types=[], task_id=?)` | Задачи страницы с фильтрами. `themes=['2.4']` — тема КЭС; `answer_types=['short'\|'full'\|'select_one']` — тип ответа. |
+| `list_kes_topics(subject, exam='ege')` | Дерево кодификатора: разделы 1..N + подтемы. `code` подходит для `themes` фильтра выше. |
+| `get_task(subject, qid, exam='ege')` | Ищет конкретное задание по короткому qid, перебирая страницы. |
+| `check_answer(subject, guid, answer, exam='ege')` | POST на `solve.php`. Клиент сам прогревает сессию. Возвращает `correct` / `wrong` / `not_found`. |
 
 `subject` принимает три формата: ключ (`physics`), русское название (`Физика`)
-или полный `proj_guid`.
+или полный `proj_guid`. `exam` — `'ege'` (по умолчанию) или `'oge'`.
 
 ## Установка
 
@@ -82,6 +84,7 @@ claude mcp add fipi-bank \
 - «Дай 5 задач по профильной математике по теме `2.4` (показательные и логарифмические уравнения).»
 - «Найди в банке ФИПИ задание `40B442` по профильной математике и объясни решение.»
 - «Проверь ответ `29` на задание с guid `006420F9E9A798DD4FF57BB34671C6AA` по профильной математике.»
+- «Покажи 3 задачи по математике **ОГЭ** (`exam='oge'`) из fipi-bank.»
 
 ## Как это устроено
 

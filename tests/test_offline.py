@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fipi_mcp.mathml import mathml_to_latex
 from fipi_mcp.parser import parse_kes_topics, parse_tasks
-from fipi_mcp.subjects import SUBJECTS_EGE, resolve
+from fipi_mcp.subjects import SUBJECTS_EGE, SUBJECTS_OGE, resolve
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE = FIXTURES / "questions_math_prof.html"
@@ -26,10 +26,16 @@ def _check(cond: bool, msg: str) -> None:
 def main() -> None:
     print("Subjects registry:")
     _check(len(SUBJECTS_EGE) == 16, "16 EGE subjects registered")
-    _check(resolve("physics")[0] == "Физика", "resolve('physics') → Физика")
+    _check(len(SUBJECTS_OGE) == 14, "14 OGE subjects registered")
+    _check(resolve("physics")[0] == "Физика", "resolve('physics', ege) → Физика")
     _check(
         resolve("AC437B34557F88EA4115D2F374B0A07B")[0].startswith("Мат"),
         "resolve() accepts proj-GUID",
+    )
+    _check(resolve("math", exam="oge")[0] == "Математика", "resolve('math', oge) works")
+    _check(
+        resolve("physics", exam="oge")[1] == "B24AFED7DE6AB5BC461219556CCA4F9B",
+        "OGE physics guid matches",
     )
 
     print("\nParser against saved fixture:")

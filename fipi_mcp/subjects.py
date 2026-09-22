@@ -17,18 +17,52 @@ SUBJECTS_EGE: dict[str, tuple[str, str]] = {
     "chemistry":   ("Химия",                          "EA45D8517ABEB35140D0D83E76F14A41"),
 }
 
+SUBJECTS_OGE: dict[str, tuple[str, str]] = {
+    "english":     ("Английский язык",   "8BBD5C99F37898B6402964AB11955663"),
+    "biology":     ("Биология",          "0E1FA4229923A5CE4FC368155127ED90"),
+    "geography":   ("География",         "0FA4DA9E3AE2BA1547B75F0B08EF6445"),
+    "informatics": ("Информатика",       "74676951F093A0754D74F2D6E7955F06"),
+    "spanish":     ("Испанский язык",    "7FF0B02E53DFBCDE4F56B0148BE9A236"),
+    "history":     ("История",           "3CBBE97571208D9140697A6C2ABE91A0"),
+    "literature":  ("Литература",        "6B2CD4C77304B2A3478E5A5B61F6899A"),
+    "math":        ("Математика",        "DE0E276E497AB3784C3FC4CC20248DC0"),
+    "german":      ("Немецкий язык",     "A2AC67AE354EBC5242C49482CBC13451"),
+    "social":      ("Обществознание",    "AE63AB28A2D28E194A286FA5A8EB9A78"),
+    "russian":     ("Русский язык",      "2F5EE3B12FE2A0EA40B06BF61A015416"),
+    "physics":     ("Физика",            "B24AFED7DE6AB5BC461219556CCA4F9B"),
+    "french":      ("Французский язык",  "2A4C52ED5AC1ADA644B8BBF169FEC0FC"),
+    "chemistry":   ("Химия",             "33B3A93C5A6599124B04FB95616C835B"),
+}
 
-def resolve(subject: str) -> tuple[str, str]:
-    """Принимает ключ ('physics'), русское название или proj-GUID → (name, guid)."""
+_REGISTRY: dict[str, dict[str, tuple[str, str]]] = {
+    "ege": SUBJECTS_EGE,
+    "oge": SUBJECTS_OGE,
+}
+
+
+def registry(exam: str) -> dict[str, tuple[str, str]]:
+    key = exam.lower().strip()
+    if key not in _REGISTRY:
+        raise ValueError(f"Unknown exam {exam!r}: use 'ege' or 'oge'")
+    return _REGISTRY[key]
+
+
+def resolve(subject: str, exam: str = "ege") -> tuple[str, str]:
+    """Принимает ключ ('physics'), русское название или proj-GUID → (name, guid).
+
+    `exam` — 'ege' (по умолчанию) или 'oge'.
+    """
+    reg = registry(exam)
     q = subject.strip()
-    if q.lower() in SUBJECTS_EGE:
-        return SUBJECTS_EGE[q.lower()]
-    for name, guid in SUBJECTS_EGE.values():
+    if q.lower() in reg:
+        return reg[q.lower()]
+    for name, guid in reg.values():
         if guid.upper() == q.upper():
             return name, guid
-    for name, guid in SUBJECTS_EGE.values():
+    for name, guid in reg.values():
         if name.lower() == q.lower():
             return name, guid
     raise ValueError(
-        f"Unknown subject {subject!r}. Use list_subjects() to see valid keys/names."
+        f"Unknown {exam.upper()} subject {subject!r}. "
+        f"Use list_subjects(exam='{exam}') to see valid keys/names."
     )

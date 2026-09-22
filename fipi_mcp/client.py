@@ -3,21 +3,29 @@ from typing import Any
 
 import httpx
 
-BASE_URL = "https://ege.fipi.ru/bank"
+BASE_URLS = {
+    "ege": "https://ege.fipi.ru/bank",
+    "oge": "https://oge.fipi.ru/bank",
+}
 
 
 class FipiClient:
-    """Тонкая обёртка над PHP-эндпоинтами открытого банка ФИПИ.
+    """Тонкая обёртка над PHP-эндпоинтами открытого банка ФИПИ (ЕГЭ и ОГЭ).
 
     Особенности:
     - страницы отдаются в cp1251;
-    - SSL сертификат ege.fipi.ru не валидируется обычными клиентами (Astra Linux CA);
-    - PHPSESSID хранится в session между запросами.
+    - SSL сертификат [ое]ge.fipi.ru не валидируется обычными клиентами;
+    - PHPSESSID хранится в session между запросами;
+    - solve.php требует прогретой сессии (см. warmup).
     """
 
-    def __init__(self, timeout: float = 20.0) -> None:
+    def __init__(self, exam: str = "ege", timeout: float = 20.0) -> None:
+        exam_key = exam.lower().strip()
+        if exam_key not in BASE_URLS:
+            raise ValueError(f"Unknown exam {exam!r}: use 'ege' or 'oge'")
+        self.exam = exam_key
         self._client = httpx.Client(
-            base_url=BASE_URL,
+            base_url=BASE_URLS[exam_key],
             verify=False,
             timeout=timeout,
             follow_redirects=True,
